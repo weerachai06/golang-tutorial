@@ -5,13 +5,33 @@ Content-Type: application/json
 # @name auth
 
 ###
+GET {{base_url}}/x
+
+###
+GET {{base_url}}/healthz
+
+###
 
 @token = {{auth.response.body.$.token}}
 
 POST  {{base_url}}/todos
 Content-Type: application/json
 Authorization: Bearer {{token}}
+TransactionID: X123
 
 {
-  "text": "test 56"
+  "text": "sit"
 }
+
+
+###
+GET {{base_url}}/todos
+Content-Type: application/json
+Authorization: Bearer {{token}}
+TransactionID: X123
+
+###
+DELETE  {{base_url}}/todos/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+TransactionID: X123

@@ -12,9 +12,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/weerachai06/todo/auth"
-	"github.com/weerachai06/todo/todo"
-	"gorm.io/driver/sqlite"
+	"github.com/weerachai06/golang-tutorial/auth"
+	"github.com/weerachai06/golang-tutorial/todo"
+	"golang.org/x/time/rate"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -30,11 +31,19 @@ var (
 )
 
 func main() {
-	err := godotenv.Load("local.env")
+	//<<< Liveness
+	_, err := os.Create("/tmp/live")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove("/tmp/live")
+	// Liveness>>
+	err = godotenv.Load("local.env")
 	if err != nil {
 		log.Printf("Please consider environment variables: %s", err)
 	}
-	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+
+	db, err := gorm.Open(mysql.Open(os.Getenv("DB_CONN")), &gorm.Config{})
 	if err != nil {
 		panic("failed to conntect database")
 	}
@@ -43,9 +52,13 @@ func main() {
 
 	//db.Create(&User{Name: "Petch"})
 	r := gin.Default()
-	//userHandler := UserHandler{db: db}
 
-	//r.GET("users", userHandler.User)
+	r.GET("/limitz", limitedHandler)
+
+	r.GET("/healthz", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
 	r.GET("/x", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"buildcommit": buildcommit,
@@ -57,6 +70,8 @@ func main() {
 	handler := todo.NewTodoHandler(db)
 
 	protected.POST("/todos", handler.NewTask)
+	protected.GET("/todos", handler.List)
+	protected.DELETE("/todos/:id", handler.Delete)
 
 	//r.Run()
 
@@ -88,6 +103,18 @@ func main() {
 	if err := s.Shutdown(timeOutCtx); err != nil {
 		fmt.Println(err)
 	}
+}
+
+var limiter = rate.NewLimiter(5, 5)
+
+func limitedHandler(c *gin.Context) {
+	if !limiter.Allow() {
+		c.AbortWithStatus(http.StatusTooManyRequests)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "pong",
+	})
 }
 
 /* type UserHandler struct {
